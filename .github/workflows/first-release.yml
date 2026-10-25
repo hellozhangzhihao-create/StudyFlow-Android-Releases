@@ -1,0 +1,33 @@
+name: Publish first signed StudyFlow V11 APK
+on:
+  push:
+    paths:
+      - '.github/workflows/first-release.yml'
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download previously signed build
+        env:
+          ARTIFACT_URL: "https://sdmntprcentralus.oaiusercontent.com/files/00000000-07c0-81f5-98b5-399ea14d71d8/raw?se=2026-10-25T16%3A43%3A24Z&sp=r&sv=2026-02-06&sr=b&scid=a97c1524-3d70-5ad6-9be5-0c5577397fde&skoid=2757bbe4-5137-4324-975b-acedc0bad279&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-10-25T02%3A03%3A54Z&ske=2026-10-26T02%3A03%3A54Z&sks=b&skv=2026-02-06&sig=Nve0dUtZnfisJUtNF6c%2BIdHf%2B3bUnGaxBAhdqfhVjYk%3D"
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error --retry 2 --max-time 90 "$ARTIFACT_URL" -o signed.zip
+          unzip -j signed.zip 'StudyFlow-V11-release.apk' -d .
+          echo "8e528673a11c866b27acb1eebaaa4cdb5d2bc202b6c9a315c35472f45ba766d4  StudyFlow-V11-release.apk" | sha256sum --check --status
+          test -s StudyFlow-V11-release.apk
+      - name: Publish signed APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if ! gh release view v1.0.11 >/dev/null 2>&1; then
+            gh release create v1.0.11 StudyFlow-V11-release.apk \
+              --title 'StudyFlow V11 · 1.0.11' \
+              --notes '首次公开发布的固定密钥签名 APK。此版本提供应用内更新检查、签名校验和系统安装确认。仅公开 APK，不公开私有源代码。'
+          fi
+          gh release view v1.0.11 --json tagName,assets,url
